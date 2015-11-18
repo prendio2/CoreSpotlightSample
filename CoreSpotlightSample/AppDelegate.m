@@ -12,8 +12,6 @@
 
 @interface AppDelegate ()
 
-@property (nonatomic, strong) NSDateFormatter *dateFormatter;
-
 @end
 
 @implementation AppDelegate
@@ -21,11 +19,9 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
-    
-    self.dateFormatter = [[NSDateFormatter alloc] init];
-    self.dateFormatter.dateStyle = NSDateFormatterMediumStyle;
-    
-    [self resetIndex];
+    [self resetIndexAnd:^{
+        [self createIndex];
+    }];
     return YES;
 }
 
@@ -49,17 +45,18 @@
 
 - (void)applicationWillTerminate:(UIApplication *)application {
     // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+    [self resetIndexAnd:nil];
 }
 
 
-- (void)resetIndex
+- (void)resetIndexAnd:(void (^)(void))thenBlock
 {
     [[CSSearchableIndex defaultSearchableIndex] deleteAllSearchableItemsWithCompletionHandler:^(NSError * _Nullable error) {
         if (!error) {
             NSLog(@"Removed everything from index");
-            
-            [self createIndex];
-            
+            if (thenBlock != nil) {
+                thenBlock();
+            }
         } else {
             NSLog(@"Failed to remove from index with error %@",error);
         }
@@ -68,62 +65,26 @@
 
 - (void)createIndex
 {
-    [self addPodcastToIndex];
-}
-
-- (void)addPodcastToIndex
-{
-    CSSearchableItemAttributeSet *attributes = [[CSSearchableItemAttributeSet alloc] initWithItemContentType:(NSString *)kUTTypeImage];
-    attributes.title = @"Sample Podcast";
-    attributes.contentDescription = @"A Sample Podcast used to illustrate this CoreSpotlight issue";
-    attributes.thumbnailData = UIImagePNGRepresentation([UIImage imageNamed:@"artwork"]);
-    
-    NSString *identifier = @"co.supertop.podcast.sample";
-    
-    CSSearchableItem *item = [[CSSearchableItem alloc] initWithUniqueIdentifier:identifier
-                                                               domainIdentifier:@"co.supertop.podcast"
-                                                                   attributeSet:attributes];
-    
-    [[CSSearchableIndex defaultSearchableIndex] indexSearchableItems:@[item] completionHandler:^(NSError * _Nullable error) {
-        if (!error) {
-            NSLog(@"Added Sample Podcast to index");
-        } else {
-            NSLog(@"Failed to index Sample Podcast with error %@", error);
-        }
-    }];
-    
-    for (NSUInteger i = 1; i < 100; i++) {
-        [self addEpisodeToIndexWithEpisodeNumber:i];
+    for (NSUInteger i = 1; i < 10000; i++) {
+        [self addEpisodeToIndexWithEpisodeNumber:@(i) thumbnailData:UIImagePNGRepresentation([UIImage imageNamed:@"artwork"])];
     }
 }
 
-- (void)addEpisodeToIndexWithEpisodeNumber:(NSUInteger)episodeNumber
+- (void)addEpisodeToIndexWithEpisodeNumber:(NSNumber *)episodeNumber thumbnailData:(NSData *)thumbnailData
 {
-    NSString *episodeTitle = [NSString stringWithFormat:@"Sample Podcast: Episode %lu", episodeNumber];
-    NSDate *episodeReleaseDate = [NSDate dateWithTimeIntervalSinceReferenceDate:(episodeNumber * 604800)];
+    CSSearchableItemAttributeSet *attributes = [[CSSearchableItemAttributeSet alloc] initWithItemContentType:(NSString *)kUTTypeAudiovisualContent];
     
-    CSSearchableItemAttributeSet *attributes = [[CSSearchableItemAttributeSet alloc] initWithItemContentType:(NSString *)kUTTypeAudio];
-    attributes.title = episodeTitle;
-    attributes.contentDescription = [NSString stringWithFormat:@"[%@] Episode %lu of this fictional sample podcast", [self.dateFormatter stringFromDate:episodeReleaseDate], episodeNumber];
-    attributes.thumbnailData = UIImagePNGRepresentation([UIImage imageNamed:@"artwork"]);
-    attributes.metadataModificationDate = episodeReleaseDate;
+    attributes.title = [NSString stringWithFormat:@"Sample Podcast: Episode %@", episodeNumber];
+    attributes.contentDescription = [NSString stringWithFormat:@"Episode %@ of this fictional sample podcast", episodeNumber];
+    attributes.thumbnailData = thumbnailData;
     
-    attributes.containerTitle = @"Sample Podcast";
-    attributes.containerIdentifier = @"co.supertop.podcast.sample";
-    attributes.containerOrder = @(episodeNumber);
-    
-    NSString *identifier = [NSString stringWithFormat:@"co.supertop.podcast.sample.episode.%lu",episodeNumber];
-    NSString *domain = [NSString stringWithFormat:@"co.supertop.episode.podcast.sample.%lu",episodeNumber];
-    
-    CSSearchableItem *item = [[CSSearchableItem alloc] initWithUniqueIdentifier:identifier
-                                                               domainIdentifier:domain
-                                                                   attributeSet:attributes];
+    CSSearchableItem *item = [[CSSearchableItem alloc] initWithUniqueIdentifier:nil domainIdentifier:nil attributeSet:attributes];
     
     [[CSSearchableIndex defaultSearchableIndex] indexSearchableItems:@[item] completionHandler:^(NSError * _Nullable error) {
         if (!error) {
-            NSLog(@"Added %@ to index", episodeTitle);
+            NSLog(@"Added episode %@ to index", episodeNumber);
         } else {
-            NSLog(@"Failed to index %@ with error %@", episodeTitle, error);
+            NSLog(@"Failed to index episode %@ with error %@", episodeNumber, error);
         }
     }];
 }
